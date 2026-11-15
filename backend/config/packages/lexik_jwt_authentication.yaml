@@ -1,0 +1,34 @@
+lexik_jwt_authentication:
+    # =========================================================================
+    # CLÉS DE SIGNATURE JWT
+    # =========================================================================
+    # Le JWT est signé avec une clé privée (RSA) et vérifié avec la clé publique.
+    # C'est comme un sceau officiel : seul Symfony peut créer des tokens valides,
+    # mais n'importe qui peut vérifier qu'un token est authentique.
+    #
+    # Ces clés sont générées avec la commande :
+    # php bin/console lexik:jwt:generate-keypair
+    #
+    # Les chemins sont relatifs au dossier du projet
+    secret_key: '%env(resolve:JWT_SECRET_KEY)%'   # Clé privée RSA (signe les tokens)
+    public_key: '%env(resolve:JWT_PUBLIC_KEY)%'   # Clé publique RSA (vérifie les tokens)
+    pass_phrase: '%env(JWT_PASSPHRASE)%'           # Phrase secrète pour protéger la clé privée
+
+    # =========================================================================
+    # DURÉE DE VIE DU TOKEN
+    # =========================================================================
+    # 3600 secondes = 1 heure
+    # Après ce délai, le token est invalide → l'utilisateur doit se reconnecter
+    # Pour le développement, on peut mettre 86400 (24 heures)
+    token_ttl: 3600
+
+    # =========================================================================
+    # OÙ LE TOKEN EST ENVOYÉ PAR REACT
+    # =========================================================================
+    # React doit envoyer le token dans l'en-tête Authorization :
+    # Authorization: Bearer eyJhbGciOiJSUzI1NiJ9...
+    token_extractors:
+        authorization_header:
+            enabled: true
+            prefix: Bearer    # Le préfixe standard pour les tokens JWT
+            name: Authorization

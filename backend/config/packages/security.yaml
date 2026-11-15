@@ -1,0 +1,82 @@
+security:
+    # =========================================================================
+    # HASHAGE DES MOTS DE PASSE
+    # =========================================================================
+    # 'auto' = Symfony choisit automatiquement le meilleur algorithme disponible
+    # Sur PHP 8.2+, il utilise bcrypt ou sodium (argon2id)
+    # Le hash résultant ressemble à : $2y$13$XXXXXXXXXXXXXXXXXXXXXXX...
+    password_hashers:
+        Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface: 'auto'
+
+    # =========================================================================
+    # PROVIDERS — Comment Symfony charge un utilisateur depuis la BDD
+    # =========================================================================
+    providers:
+        # On remplace le provider en mémoire par notre UserRepository
+        # Symfony utilisera UserRepository::findOneByEmail() pour charger l'utilisateur
+        app_user_provider:
+            entity:
+                class: App\Entity\User          # Notre entité User
+                property: email                  # Identifiant = l'email
+
+    # =========================================================================
+    # FIREWALLS — Règles de sécurité par zone
+    # =========================================================================
+    firewalls:
+        # Zone de développement : profiler Symfony, assets, etc. → pas de sécurité
+        dev:
+            pattern: ^/(_profiler(/|$)|(_wdt|assets|build)/)
+            security: false
+
+        # Zone API : toutes nos routes /api/
+        main:
+            lazy: true
+            provider: app_user_provider   # Utilise notre provider ci-dessus
+
+            # --- Authentification par JWT ---
+            # Le bundle LexikJWT intercepte la route /api/login
+            # Il vérifie l'email + mot de passe et retourne un token JWT
+            json_login:
+                check_path: /api/login            # Route écoutée pour la connexion
+                username_path: email              # Champ email dans le JSON
+                password_path: password           # Champ password dans le JSON
+                success_handler: lexik_jwt_authentication.handler.authentication_success
+                failure_handler: lexik_jwt_authentication.handler.authentication_failure
+
+            # Le bundle LexikJWT lit le token dans l'en-tête Authorization
+            # Authorization: Bearer eyJhbGciOiJSUzI1NiJ9.eyJpYXQi...
+            jwt: ~
+
+            # Déconnexion : React supprime le token côté client
+            logout:
+                path: api_logout
+
+    # Hiérarchie des rôles : un ADMIN hérite de tous les droits ATHLETE et USER
+    role_hierarchy:
+        ROLE_ADMIN: [ROLE_ATHLETE, ROLE_USER]
+        ROLE_ATHLETE: [ROLE_USER]
+
+    # =========================================================================
+    # CONTRÔLE D'ACCÈS — Qui peut accéder à quoi
+    # =========================================================================
+    # Les règles sont vérifiées de HAUT en BAS. La première qui correspond s'applique.
+    access_control:
+        # Routes publiques — pas besoin d'être connecté
+        - { path: ^/api/health,    roles: PUBLIC_ACCESS }
+        - { path: ^/api/register,  roles: PUBLIC_ACCESS }
+        - { path: ^/api/login,     roles: PUBLIC_ACCESS }
+
+        # Routes d'administration — réservées strictement à l'administrateur
+        - { path: ^/api/admin,     roles: ROLE_ADMIN }
+
+        # Toutes les autres routes /api/ nécessitent d'être connecté (ROLE_USER ou ROLE_ATHLETE)
+        - { path: ^/api,           roles: ROLE_USER }
+
+when@test:
+    security:
+        password_hashers:
+            Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface:
+                algorithm: auto
+                cost: 4
+                time_cost: 3
+                memory_cost: 10

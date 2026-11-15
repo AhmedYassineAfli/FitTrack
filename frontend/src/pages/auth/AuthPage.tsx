@@ -1,6 +1,7 @@
-import { useState } from "react"
-import { Eye, EyeOff, ChevronRight, Sparkles } from "lucide-react"
+import { useState, type FormEvent } from "react"
+import { Eye, EyeOff, ChevronRight, Sparkles, AlertCircle } from "lucide-react"
 import { Brand, Button, IconButton, Input } from "../../components/common"
+import { useAuth } from "../../context/AuthContext"
 import type { Page } from "../../types"
 
 const AUTH_HERO_IMAGE =
@@ -12,14 +13,86 @@ interface AuthPageProps {
 }
 
 export function AuthPage({ mode, setPage }: AuthPageProps) {
+  const { login, register } = useAuth()
   const [showPassword, setShowPassword] = useState(false)
   const isLogin = mode === "login"
+
+  // Champs de formulaire
+  const [fullName, setFullName] = useState("")
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [goal, setGoal] = useState("muscle_gain")
+
+  // États de validation et chargement
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault()
+    setErrorMessage(null)
+
+    // 1. Validation de base côté client
+    if (!email.trim() || !password.trim()) {
+      setErrorMessage("Veuillez remplir l'adresse email et le mot de passe.")
+      return
+    }
+
+    if (!isLogin) {
+      if (!fullName.trim()) {
+        setErrorMessage("Veuillez renseigner votre nom complet.")
+        return
+      }
+      if (password !== confirmPassword) {
+        setErrorMessage("Les mots de passe ne correspondent pas.")
+        return
+      }
+      if (password.length < 6) {
+        setErrorMessage("Le mot de passe doit comporter au moins 6 caractères.")
+        return
+      }
+    }
+
+    setIsSubmitting(true)
+
+    try {
+      if (isLogin) {
+        // Appel POST /api/login via Symfony
+        await login(email.trim(), password)
+      } else {
+        // Séparer prénom et nom
+        const nameParts = fullName.trim().split(" ")
+        const firstName = nameParts[0] || "Athlète"
+        const lastName = nameParts.slice(1).join(" ") || "FitTrack"
+
+        // Appel POST /api/register via Symfony
+        await register({
+          firstName,
+          lastName,
+          email: email.trim(),
+          password,
+          fitnessGoal: goal,
+        })
+      }
+
+      // Connexion réussie -> redirection vers le dashboard
+      setPage("dashboard")
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setErrorMessage(err.message)
+      } else {
+        setErrorMessage("Identifiants incorrects ou problème serveur.")
+      }
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
   return (
     <main className="auth-shell">
       <section className="auth-panel">
         <Brand />
-        <div className="auth-form">
+        <form className="auth-form" onSubmit={handleSubmit}>
           <span className="eyebrow">
             {isLogin ? "WELCOME BACK" : "START YOUR JOURNEY"}
           </span>
@@ -30,18 +103,50 @@ export function AuthPage({ mode, setPage }: AuthPageProps) {
               : "Create your account and turn intention into progress."}
           </p>
 
-          {!isLogin && <Input label="Full name" placeholder="Alex Morgan" />}
+          {/* Affichage d'erreur en cas de problème */}
+          {errorMessage && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                padding: "10px 14px",
+                borderRadius: "8px",
+                backgroundColor: "rgba(239, 68, 68, 0.15)",
+                border: "1px solid rgba(239, 68, 68, 0.4)",
+                color: "#ef4444",
+                fontSize: "14px",
+                marginBottom: "12px",
+              }}
+            >
+              <AlertCircle size={18} />
+              <span>{errorMessage}</span>
+            </div>
+          )}
+
+          {!isLogin && (
+            <Input
+              label="Full name"
+              placeholder="Alex Morgan"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+            />
+          )}
 
           <Input
             label="Email address"
             placeholder="you@example.com"
             type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
           />
 
           <Input
             label="Password"
-            placeholder="At least 8 characters"
+            placeholder="At least 6 characters"
             type={showPassword ? "text" : "password"}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
             suffix={
               <IconButton
                 label="Toggle password visibility"
@@ -57,6 +162,8 @@ export function AuthPage({ mode, setPage }: AuthPageProps) {
               label="Confirm password"
               placeholder="Repeat your password"
               type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
             />
           )}
 
@@ -72,24 +179,35 @@ export function AuthPage({ mode, setPage }: AuthPageProps) {
             <div className="goal-select">
               <span>Primary fitness goal</span>
               <div>
-                {["Weight loss", "Muscle gain", "General fitness"].map(
-                  (goal, idx) => (
-                    <label key={goal}>
-                      <input
-                        name="goal"
-                        type="radio"
-                        defaultChecked={idx === 1}
-                      />
-                      <span>{goal}</span>
-                    </label>
-                  ),
-                )}
+                {[
+                  { label: "Weight loss", val: "weight_loss" },
+                  { label: "Muscle gain", val: "muscle_gain" },
+                  { label: "General fitness", val: "general_fitness" },
+                ].map(({ label, val }) => (
+                  <label key={val}>
+                    <input
+                      name="goal"
+                      type="radio"
+                      checked={goal === val}
+                      onChange={() => setGoal(val)}
+                    />
+                    <span>{label}</span>
+                  </label>
+                ))}
               </div>
             </div>
           )}
 
-          <Button className="full" onClick={() => setPage("dashboard")}>
-            {isLogin ? "Sign in" : "Create account"}
+          <Button
+            className="full"
+            type="submit"
+            disabled={isSubmitting}
+          >
+            {isSubmitting
+              ? "Connecting..."
+              : isLogin
+              ? "Sign in"
+              : "Create account"}
             <ChevronRight size={17} />
           </Button>
 
@@ -97,12 +215,15 @@ export function AuthPage({ mode, setPage }: AuthPageProps) {
             {isLogin ? "New to FitTrack?" : "Already have an account?"}{" "}
             <button
               type="button"
-              onClick={() => setPage(isLogin ? "register" : "login")}
+              onClick={() => {
+                setErrorMessage(null)
+                setPage(isLogin ? "register" : "login")
+              }}
             >
               {isLogin ? "Create an account" : "Sign in"}
             </button>
           </p>
-        </div>
+        </form>
 
         <small className="copyright">
           © 2025 FitTrack. Built for progress.

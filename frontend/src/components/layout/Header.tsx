@@ -1,5 +1,6 @@
 import { Menu, Bell } from "lucide-react"
 import { IconButton } from "../common"
+import { useAuth } from "../../context/AuthContext"
 import { pageTitles } from "./navConfig"
 import type { Page } from "../../types"
 
@@ -10,7 +11,11 @@ interface HeaderProps {
 }
 
 export function Header({ page, onOpenMenu, onAvatarClick }: HeaderProps) {
+  const { user } = useAuth()
   const title = pageTitles[page] || "Dashboard"
+  const initials = user
+    ? `${user.firstName[0]?.toUpperCase() || ""}${user.lastName[0]?.toUpperCase() || ""}`
+    : "AM"
 
   return (
     <header>
@@ -38,7 +43,7 @@ export function Header({ page, onOpenMenu, onAvatarClick }: HeaderProps) {
             if (e.key === "Enter" || e.key === " ") onAvatarClick?.()
           }}
         >
-          AM
+          {initials}
         </div>
       </div>
     </header>

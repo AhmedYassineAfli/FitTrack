@@ -10,6 +10,7 @@ interface InputProps {
   onChange?: (e: ChangeEvent<HTMLInputElement>) => void
   name?: string
   required?: boolean
+  disabled?: boolean
   className?: string
 }
 
@@ -23,6 +24,7 @@ export function Input({
   onChange,
   name,
   required,
+  disabled,
   className = "",
 }: InputProps) {
   return (
@@ -37,6 +39,7 @@ export function Input({
           onChange={onChange}
           name={name}
           required={required}
+          disabled={disabled}
         />
         {suffix}
       </div>

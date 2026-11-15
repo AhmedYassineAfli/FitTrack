@@ -1,5 +1,6 @@
-import { useState, type ReactNode } from "react"
+import { useState, useEffect, type ReactNode } from "react"
 import { Shell } from "./components/layout"
+import { useAuth } from "./context/AuthContext"
 import {
   AuthPage,
   DashboardPage,
@@ -8,20 +9,64 @@ import {
   WorkoutsPage,
   CreateWorkoutPage,
   ExercisesPage,
-  StatisticsPage,
   ProgramsPage,
-  ProgramDetailsPage,
-  CalendarPage,
-  AchievementsPage,
   SettingsPage,
 } from "./pages"
 import type { Page } from "./types"
 
 export default function App() {
-  const [page, setPage] = useState<Page>("dashboard")
+  const { user, token, loading } = useAuth()
+  // Par défaut : page de connexion
+  const [page, setPage] = useState<Page>("login")
 
+  const isAuthenticated = Boolean(token && user)
+
+  // Si l'utilisateur est connecté et arrive sur login, on bascule sur dashboard
+  useEffect(() => {
+    if (isAuthenticated && (page === "login" || page === "register")) {
+      setPage("dashboard")
+    }
+  }, [isAuthenticated, page])
+
+  // Pendant la vérification du token au démarrage
+  if (loading) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          height: "100vh",
+          backgroundColor: "#080808",
+          color: "#22c55e",
+          fontFamily: "sans-serif",
+          fontSize: "18px",
+          fontWeight: 600,
+        }}
+      >
+        FitTrack...
+      </div>
+    )
+  }
+
+  // Si l'utilisateur n'est PAS connecté -> forcer la page login ou register
+  if (!isAuthenticated) {
+    return (
+      <AuthPage
+        mode={page === "register" ? "register" : "login"}
+        setPage={setPage}
+      />
+    )
+  }
+
+  // Si connecté mais que page = login/register
   if (page === "login" || page === "register") {
-    return <AuthPage mode={page} setPage={setPage} />
+    return (
+      <AuthPage
+        mode={page}
+        setPage={setPage}
+      />
+    )
   }
 
   const renderContent = (): ReactNode => {
@@ -38,16 +83,8 @@ export default function App() {
         return <CreateWorkoutPage setPage={setPage} />
       case "exercises":
         return <ExercisesPage />
-      case "statistics":
-        return <StatisticsPage />
       case "programs":
         return <ProgramsPage setPage={setPage} />
-      case "program-details":
-        return <ProgramDetailsPage setPage={setPage} />
-      case "calendar":
-        return <CalendarPage />
-      case "achievements":
-        return <AchievementsPage />
       case "settings":
         return <SettingsPage />
       default:

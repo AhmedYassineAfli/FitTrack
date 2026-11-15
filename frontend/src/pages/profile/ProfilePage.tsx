@@ -1,5 +1,5 @@
-import { useState } from "react"
-import { Pencil, Check } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Pencil, Check, AlertCircle } from "lucide-react"
 import {
   Card,
   SectionTitle,
@@ -8,30 +8,111 @@ import {
   Input,
   Select,
 } from "../../components/common"
-import { currentUser } from "../../data/mockData"
+import { useAuth } from "../../context/AuthContext"
+import { api } from "../../services/api"
 
 export function ProfilePage() {
-  const [profile, setProfile] = useState(currentUser)
-  const [savedNotification, setSavedNotification] = useState(false)
+  const { user, refreshUser } = useAuth()
 
-  const handleSave = () => {
-    setSavedNotification(true)
-    setTimeout(() => setSavedNotification(false), 2500)
+  // États du profil modifiable
+  const [firstName, setFirstName] = useState("")
+  const [lastName, setLastName] = useState("")
+  const [age, setAge] = useState<number | string>("")
+  const [height, setHeight] = useState<number | string>("")
+  const [fitnessGoal, setFitnessGoal] = useState("muscle_gain")
+  const [experienceLevel, setExperienceLevel] = useState("intermediate")
+
+  // États de feedback
+  const [savedNotification, setSavedNotification] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
+
+  // Remplir les champs avec les données réelles du backend
+  useEffect(() => {
+    if (user) {
+      setFirstName(user.firstName || "")
+      setLastName(user.lastName || "")
+      setAge(user.age ?? "")
+      setHeight(user.height ?? "")
+      setFitnessGoal(user.fitnessGoal || "muscle_gain")
+      setExperienceLevel(user.experienceLevel || "intermediate")
+    }
+  }, [user])
+
+  const handleSave = async () => {
+    setIsSaving(true)
+    setErrorMessage(null)
+
+    try {
+      await api.updateProfile({
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        age: age ? Number(age) : null,
+        height: height ? Number(height) : null,
+        fitnessGoal,
+        experienceLevel,
+      })
+
+      // Mettre à jour l'utilisateur dans le contexte React
+      await refreshUser()
+
+      setSavedNotification(true)
+      setTimeout(() => setSavedNotification(false), 2500)
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setErrorMessage(err.message)
+      } else {
+        setErrorMessage("Erreur lors de la sauvegarde du profil.")
+      }
+    } finally {
+      setIsSaving(false)
+    }
   }
+
+  const initials = user
+    ? `${user.firstName[0]?.toUpperCase() || ""}${user.lastName[0]?.toUpperCase() || ""}`
+    : "YA"
+
+  const memberSinceFormatted = user?.createdAt
+    ? new Date(user.createdAt).toLocaleDateString("fr-FR", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      })
+    : "Récemment"
 
   return (
     <div className="content-narrow page-stack">
       <Card className="profile-hero">
-        <div className="avatar xl">AM</div>
+        <div className="avatar xl">{initials}</div>
         <div>
-          <Tag>INTERMEDIATE ATHLETE</Tag>
-          <h1>{profile.name}</h1>
+          <Tag>{(experienceLevel || "intermediate").toUpperCase()} ATHLETE</Tag>
+          <h1>{user?.fullName || `${firstName} ${lastName}`}</h1>
           <p>Building strength, one rep at a time.</p>
         </div>
         <Button secondary icon={<Pencil size={16} />}>
           Edit profile
         </Button>
       </Card>
+
+      {errorMessage && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            padding: "10px 14px",
+            borderRadius: "8px",
+            backgroundColor: "rgba(239, 68, 68, 0.15)",
+            border: "1px solid rgba(239, 68, 68, 0.4)",
+            color: "#ef4444",
+            fontSize: "14px",
+          }}
+        >
+          <AlertCircle size={18} />
+          <span>{errorMessage}</span>
+        </div>
+      )}
 
       <Card>
         <SectionTitle
@@ -40,59 +121,54 @@ export function ProfilePage() {
         />
         <div className="form-grid">
           <Input
-            label="Full name"
-            placeholder="Alex Morgan"
-            defaultValue={profile.name}
-            onChange={(e) =>
-              setProfile((prev) => ({ ...prev, name: e.target.value }))
-            }
+            label="First name"
+            placeholder="Prénom"
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
+          />
+          <Input
+            label="Last name"
+            placeholder="Nom"
+            value={lastName}
+            onChange={(e) => setLastName(e.target.value)}
           />
           <Input
             label="Email address"
             type="email"
-            placeholder="alex@fittrack.app"
-            defaultValue={profile.email}
-            onChange={(e) =>
-              setProfile((prev) => ({ ...prev, email: e.target.value }))
-            }
+            value={user?.email || ""}
+            disabled
           />
           <Input
             label="Age"
-            placeholder="28"
-            defaultValue={profile.age}
-            onChange={(e) =>
-              setProfile((prev) => ({ ...prev, age: e.target.value }))
-            }
+            placeholder="Ex: 28"
+            type="number"
+            value={String(age)}
+            onChange={(e) => setAge(e.target.value)}
           />
           <Input
-            label="Height"
-            placeholder="180 cm"
-            defaultValue={profile.height}
-            onChange={(e) =>
-              setProfile((prev) => ({ ...prev, height: e.target.value }))
-            }
+            label="Height (cm)"
+            placeholder="Ex: 180"
+            type="number"
+            value={String(height)}
+            onChange={(e) => setHeight(e.target.value)}
           />
           <Select
             label="Fitness goal"
-            defaultValue={profile.goal}
-            onChange={(e) =>
-              setProfile((prev) => ({ ...prev, goal: e.target.value }))
-            }
+            value={fitnessGoal}
+            onChange={(e) => setFitnessGoal(e.target.value)}
           >
-            <option>Muscle gain</option>
-            <option>Weight loss</option>
-            <option>General fitness</option>
+            <option value="muscle_gain">Muscle gain</option>
+            <option value="weight_loss">Weight loss</option>
+            <option value="general_fitness">General fitness</option>
           </Select>
           <Select
             label="Experience level"
-            defaultValue={profile.level}
-            onChange={(e) =>
-              setProfile((prev) => ({ ...prev, level: e.target.value }))
-            }
+            value={experienceLevel}
+            onChange={(e) => setExperienceLevel(e.target.value)}
           >
-            <option>Intermediate</option>
-            <option>Beginner</option>
-            <option>Advanced</option>
+            <option value="beginner">Beginner</option>
+            <option value="intermediate">Intermediate</option>
+            <option value="advanced">Advanced</option>
           </Select>
         </div>
       </Card>
@@ -102,21 +178,29 @@ export function ProfilePage() {
         <div className="account-row">
           <div>
             <b>Member since</b>
-            <span>{profile.memberSince}</span>
+            <span>{memberSinceFormatted}</span>
           </div>
           <div>
             <b>Plan</b>
-            <span>{profile.plan}</span>
+            <span>FitTrack Athlete</span>
           </div>
           <div>
-            <b>Profile visibility</b>
-            <span>{profile.visibility}</span>
+            <b>Roles</b>
+            <span>{user?.roles?.join(", ") || "ROLE_USER"}</span>
           </div>
         </div>
         <div className="form-actions">
           <Button secondary>Cancel</Button>
-          <Button icon={<Check size={16} />} onClick={handleSave}>
-            {savedNotification ? "Saved!" : "Save changes"}
+          <Button
+            icon={<Check size={16} />}
+            onClick={handleSave}
+            disabled={isSaving}
+          >
+            {isSaving
+              ? "Saving..."
+              : savedNotification
+              ? "Saved!"
+              : "Save changes"}
           </Button>
         </div>
       </Card>

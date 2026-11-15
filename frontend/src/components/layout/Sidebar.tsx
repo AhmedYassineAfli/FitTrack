@@ -1,5 +1,6 @@
 import { X, Settings, LogOut, ChevronRight } from "lucide-react"
 import { Brand, IconButton } from "../common"
+import { useAuth } from "../../context/AuthContext"
 import { navItems } from "./navConfig"
 import type { Page } from "../../types"
 
@@ -11,6 +12,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ page, setPage, open, onClose }: SidebarProps) {
+  const { user, logout } = useAuth()
   const active =
     page === "create-workout"
       ? "workouts"
@@ -55,7 +57,14 @@ export function Sidebar({ page, setPage, open, onClose }: SidebarProps) {
           <Settings size={19} />
           Settings
         </button>
-        <button type="button" onClick={() => handleNavClick("login")}>
+        <button
+          type="button"
+          onClick={async () => {
+            await logout()
+            setPage("login")
+            onClose()
+          }}
+        >
           <LogOut size={19} />
           Logout
         </button>
@@ -68,10 +77,14 @@ export function Sidebar({ page, setPage, open, onClose }: SidebarProps) {
             if (e.key === "Enter" || e.key === " ") handleNavClick("profile")
           }}
         >
-          <div className="avatar">AM</div>
+          <div className="avatar">
+            {user
+              ? `${user.firstName[0]?.toUpperCase() || ""}${user.lastName[0]?.toUpperCase() || ""}`
+              : "AM"}
+          </div>
           <div>
-            <b>Alex Morgan</b>
-            <span>FitTrack Pro</span>
+            <b>{user?.fullName || "Alex Morgan"}</b>
+            <span>FitTrack Athlete</span>
           </div>
           <ChevronRight size={16} />
         </div>

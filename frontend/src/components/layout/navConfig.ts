@@ -1,8 +1,5 @@
 import {
   Activity,
-  Award,
-  BarChart3,
-  CalendarDays,
   CircleUserRound,
   Dumbbell,
   LayoutDashboard,
@@ -11,16 +8,17 @@ import {
 } from "lucide-react"
 import type { NavItem, Page } from "../../types"
 
+/**
+ * Navigation FitTrack — Uniquement les fonctionnalités réelles (Sprints 1 & 2)
+ * Les pages du Sprint 3 (Calendar, Statistics, Achievements) sont réservées à la prochaine phase.
+ */
 export const navItems: NavItem[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "profile", label: "My Profile", icon: CircleUserRound },
   { id: "measurements", label: "Measurements", icon: Activity },
   { id: "workouts", label: "Workouts", icon: Dumbbell },
   { id: "exercises", label: "Exercise Library", icon: Zap },
-  { id: "statistics", label: "Statistics", icon: BarChart3 },
   { id: "programs", label: "Programs", icon: Target },
-  { id: "calendar", label: "Calendar", icon: CalendarDays },
-  { id: "achievements", label: "Achievements", icon: Award },
 ]
 
 export const pageTitles: Record<Page, string> = {

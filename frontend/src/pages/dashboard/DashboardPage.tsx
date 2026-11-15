@@ -1,177 +1,171 @@
-import { Flame, Weight, Gauge, Dumbbell, Clock3, Trophy } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Flame, Weight, Gauge, Dumbbell, Target, Plus } from "lucide-react"
+import { useAuth } from "../../context/AuthContext"
 import {
   Card,
   SectionTitle,
   Tag,
-  Progress,
-  LineChart,
-  Bars,
   KpiCard,
   Button,
 } from "../../components/common"
+import { api, type MeasurementItem, type WorkoutSessionItem, type ProgramItem } from "../../services/api"
 import type { Page } from "../../types"
 
 interface DashboardPageProps {
   setPage?: (page: Page) => void
 }
 
-const recentWorkouts = [
-  { name: "Lower body power", date: "Yesterday", duration: "58 min" },
-  { name: "Pull strength", date: "Jun 13", duration: "64 min" },
-  { name: "Conditioning", date: "Jun 11", duration: "42 min" },
-]
-
 export function DashboardPage({ setPage }: DashboardPageProps) {
+  const { user } = useAuth()
+  const displayName = user?.firstName || "Athlète"
+
+  const [latestMeasurement, setLatestMeasurement] = useState<MeasurementItem | null>(null)
+  const [workouts, setWorkouts] = useState<WorkoutSessionItem[]>([])
+  const [programs, setPrograms] = useState<ProgramItem[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function loadDashboardData() {
+      try {
+        setLoading(true)
+        const [mRes, wRes, pRes] = await Promise.all([
+          api.getMeasurements().catch(() => ({ measurements: [] as MeasurementItem[], total: 0, latest: undefined })),
+          api.getWorkouts().catch(() => ({ workouts: [] as WorkoutSessionItem[], total: 0 })),
+          api.getPrograms().catch(() => ({ programs: [] as ProgramItem[], total: 0 })),
+        ])
+        setLatestMeasurement(mRes.latest || mRes.measurements[0] || null)
+        setWorkouts(wRes.workouts || [])
+        setPrograms(pRes.programs || [])
+      } catch (err) {
+        console.error("Erreur de chargement du dashboard :", err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadDashboardData()
+  }, [])
+
+  const activePrograms = programs.filter((p) => p.status === "active")
+
   return (
     <div className="page-stack">
       <div className="hero-row">
         <div>
-          <span className="eyebrow">MONDAY, NOVEMBER 2</span>
-          <h1>Ready to move, Alex?</h1>
-          <p>Your consistency is paying off. Keep the momentum going.</p>
+          <span className="eyebrow">TABLEAU DE BORD PERSONNEL</span>
+          <h1>Prêt pour votre séance, {displayName} ?</h1>
+          <p>Voici l'état réel de vos programmes, séances et mensurations.</p>
         </div>
         <div className="streak">
           <Flame size={19} />
-          <b>12 day streak</b>
-          <span>Personal best</span>
+          <b>{workouts.length} séances</b>
+          <span>enregistrées</span>
         </div>
       </div>
 
+      {/* KPI réels basés sur la BDD */}
       <div className="kpi-grid">
         <KpiCard
           icon={<Weight size={20} />}
-          label="Current weight"
-          value="74.2"
+          label="Poids actuel"
+          value={latestMeasurement?.weight ? `${latestMeasurement.weight}` : "—"}
           unit="kg"
-          trend="1.8 kg"
+          trend={latestMeasurement ? `du ${latestMeasurement.date}` : "À renseigner"}
         />
         <KpiCard
           icon={<Gauge size={20} />}
-          label="Body mass index"
-          value="22.9"
-          trend="Optimal"
+          label="Indice IMC"
+          value={latestMeasurement?.bmi ? `${latestMeasurement.bmi}` : "—"}
+          trend={latestMeasurement?.bmi ? (latestMeasurement.bmi < 25 ? "Optimal" : "Surpoids") : "Profil requis"}
         />
         <KpiCard
           icon={<Dumbbell size={20} />}
-          label="Total workouts"
-          value="128"
-          trend="+8 this mo."
+          label="Séances planifiées"
+          value={workouts.length.toString()}
+          trend="Historique BDD"
         />
         <KpiCard
-          icon={<Clock3 size={20} />}
-          label="Training hours"
-          value="96.5"
-          unit="hrs"
-          trend="+12%"
+          icon={<Target size={20} />}
+          label="Programmes actifs"
+          value={activePrograms.length.toString()}
+          trend={`${programs.length} au total`}
         />
       </div>
 
       <div className="dashboard-grid">
+        {/* Dernières séances réelles */}
         <Card className="span-2">
           <SectionTitle
-            title="Weight progression"
-            detail="Last 6 months"
-            action={<Tag>-5.4 kg</Tag>}
-          />
-          <LineChart />
-        </Card>
-
-        <Card>
-          <SectionTitle title="Upcoming workout" detail="Today · 18:30" />
-          <div className="upcoming-art">
-            <Dumbbell size={34} />
-            <Tag>UPPER BODY</Tag>
-          </div>
-          <h3 className="workout-name">Push strength</h3>
-          <div className="meta-row">
-            <span>
-              <Clock3 size={15} />
-              60 min
-            </span>
-            <span>
-              <Flame size={15} />
-              High
-            </span>
-            <span>7 exercises</span>
-          </div>
-          <Button className="full" onClick={() => setPage?.("workouts")}>
-            Start workout
-          </Button>
-        </Card>
-
-        <Card>
-          <SectionTitle title="Weekly volume" detail="18,450 kg total" />
-          <Bars />
-        </Card>
-
-        <Card>
-          <SectionTitle
-            title="Recent workouts"
+            title="Dernières séances d'entraînement"
+            detail="Données réelles issues de MySQL"
             action={
-              <button
-                type="button"
-                className="text-btn"
-                onClick={() => setPage?.("workouts")}
-              >
-                View all
-              </button>
+              setPage ? (
+                <Button secondary onClick={() => setPage("workouts")}>
+                  Gérer les séances
+                </Button>
+              ) : undefined
             }
           />
-          <div className="list">
-            {recentWorkouts.map((workout) => (
-              <div className="list-row" key={workout.name}>
-                <span className="list-icon">
-                  <Dumbbell size={17} />
-                </span>
-                <div>
-                  <b>{workout.name}</b>
-                  <small>{workout.date}</small>
+          {loading ? (
+            <div style={{ padding: "20px", color: "#a1a1aa" }}>Chargement...</div>
+          ) : workouts.length === 0 ? (
+            <div style={{ padding: "20px", color: "#a1a1aa" }}>
+              Aucune séance enregistrée pour l'instant. Rendez-vous dans <b>Workouts</b> pour en créer une.
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginTop: "12px" }}>
+              {workouts.slice(0, 4).map((w) => (
+                <div
+                  key={w.id}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "12px 16px",
+                    background: "#141416",
+                    borderRadius: "8px",
+                    border: "1px solid #27272a",
+                  }}
+                >
+                  <div>
+                    <b style={{ color: "#fff", display: "block" }}>{w.name}</b>
+                    <small style={{ color: "#a1a1aa" }}>
+                      {w.type ? w.type.toUpperCase() : "Musculation"} • {w.duration || 60} min
+                    </small>
+                  </div>
+                  {w.intensity && <Tag>{w.intensity}</Tag>}
                 </div>
-                <strong>{workout.duration}</strong>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </Card>
 
+        {/* Programme actif ou action rapide */}
         <Card>
-          <SectionTitle title="Body metrics" detail="Latest measurements" />
-          <div className="metric-pairs">
-            <div>
-              <span>Body fat</span>
-              <b>15.8%</b>
-              <small>-0.6%</small>
+          <SectionTitle title="Vos Programmes Sportifs" />
+          {activePrograms.length > 0 ? (
+            <div style={{ marginTop: "14px" }}>
+              <Tag>PROGRAMME EN COURS</Tag>
+              <h3 style={{ fontSize: "1.1rem", fontWeight: 700, margin: "10px 0 6px 0", color: "#fff" }}>
+                {activePrograms[0].name}
+              </h3>
+              <p style={{ color: "#a1a1aa", fontSize: "0.9rem", marginBottom: "14px" }}>
+                {activePrograms[0].description || "Programme personnalisé."}
+              </p>
+              <div style={{ fontSize: "0.85rem", color: "#22c55e", fontWeight: 600 }}>
+                Progression : {activePrograms[0].progress}%
+              </div>
             </div>
-            <div>
-              <span>Waist</span>
-              <b>81 cm</b>
-              <small>-2 cm</small>
+          ) : (
+            <div style={{ marginTop: "14px", color: "#a1a1aa", fontSize: "0.9rem" }}>
+              <p style={{ marginBottom: "14px" }}>Vous n'avez pas encore de programme actif.</p>
+              {setPage && (
+                <Button onClick={() => setPage("programs")} icon={<Plus size={16} />}>
+                  Découvrir les programmes
+                </Button>
+              )}
             </div>
-            <div>
-              <span>Chest</span>
-              <b>102 cm</b>
-              <small>+1 cm</small>
-            </div>
-            <div>
-              <span>Arms</span>
-              <b>37 cm</b>
-              <small>+0.5 cm</small>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="achievement-card">
-          <SectionTitle title="Latest achievement" />
-          <div className="achievement">
-            <div className="badge">
-              <Trophy size={30} />
-            </div>
-            <div>
-              <Tag>UNLOCKED</Tag>
-              <h3>Century Club</h3>
-              <p>Completed 100 workouts</p>
-            </div>
-          </div>
-          <Progress value={100} />
+          )}
         </Card>
       </div>
     </div>
